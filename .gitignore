@@ -1,0 +1,13 @@
+#ignore all wav, zip files
+
+#Sound files
+*.wav
+#Data files
+*.zip
+#AI model files
+*.pth
+#CSV files
+#*.csv
+#numpy files
+*.npy
+UI/._README.md
