@@ -11,3 +11,7 @@
 #numpy files
 *.npy
 UI/._README.md
+#mp3 files
+*.mp3
+#Mac os Desktop Services 
+*.DS_Store
