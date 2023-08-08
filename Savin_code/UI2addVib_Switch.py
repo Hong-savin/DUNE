@@ -179,8 +179,7 @@ class EnglishTranscriptionWidget(QtWidgets.QWidget):
         self.setLayout(layout)
 
     def open_notebook(self):
-        current_path = os.path.dirname(os.path.abspath(__file__))
-        notebook_filename = os.path.join(current_path, "SPT_eng_spinx.ipynb")
+        notebook_filename = "SPT_eng_spinx.ipynb"
         webbrowser.open(notebook_filename)
 
 
@@ -277,6 +276,98 @@ class Ui_MainWindow(object):
         self.sound_of_things.setText(_translate("MainWindow", "주변소리 감지"))
         self.English.setText(_translate("MainWindow", "영어"))
 
+import RPi.GPIO as GPIO
+import threading
+
+class VibrationController:
+    def __init__(self):
+        # 핀 번호 설정
+        self.red_button_pin = 17
+        self.yellow_button_pin = 22
+        self.green_button_pin = 27
+        self.vibration_motor_pin = 18
+        
+        # 진동 세기 초기화
+        self.vibration_intensity_temp = 100
+        self.vibration_intensity = 0
+        
+        # 이전 스위치 상태 초기화
+        self.prev_red_button_state = GPIO.HIGH
+        self.prev_yellow_button_state = GPIO.HIGH
+        self.prev_green_button_state = GPIO.HIGH
+        
+        self.debounce_time = 0.2
+        
+        # 진동 상태를 저장하는 변수
+        self.vibration_on = False
+        
+        # GPIO 초기화
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.red_button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        GPIO.setup(self.yellow_button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        GPIO.setup(self.green_button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        GPIO.setup(self.vibration_motor_pin, GPIO.OUT)
+        
+        # PWM 설정
+        self.pwm_frequency = 1000
+        self.pwm = GPIO.PWM(self.vibration_motor_pin, self.pwm_frequency)
+        self.pwm.start(self.vibration_intensity)
+    
+    def display_vibration_intensity(self):
+        print(f"진동 세기: {self.vibration_intensity}")
+    
+    def adjust_vibration_intensity(self, button_pin):
+        if button_pin == self.red_button_pin:
+            self.vibration_intensity = self.vibration_intensity_temp
+        elif button_pin == self.yellow_button_pin:
+            self.vibration_intensity = max(self.vibration_intensity - 10, 0)
+        elif button_pin == self.green_button_pin:
+            self.vibration_intensity = min(self.vibration_intensity + 10, 100)
+        
+        self.pwm.ChangeDutyCycle(self.vibration_intensity)
+        self.display_vibration_intensity()
+    
+    def run(self):
+        try:
+            while True:
+                red_button_state = GPIO.input(self.red_button_pin)
+                yellow_button_state = GPIO.input(self.yellow_button_pin)
+                green_button_state = GPIO.input(self.green_button_pin)
+        
+                if red_button_state != self.prev_red_button_state:
+                    time.sleep(self.debounce_time)
+                    if red_button_state != GPIO.input(self.red_button_pin):
+                        
+                        if not self.vibration_on:
+                            self.vibration_on = True
+                            self.adjust_vibration_intensity(self.red_button_pin)
+                        else:
+                            self.vibration_intensity_temp = self.vibration_intensity
+                            self.vibration_intensity = 0
+                            self.pwm.ChangeDutyCycle(self.vibration_intensity)
+                            self.display_vibration_intensity()
+                            self.vibration_on = False
+        
+                    self.prev_red_button_state = red_button_state
+        
+                if yellow_button_state != self.prev_yellow_button_state:
+                    time.sleep(self.debounce_time)
+                    if yellow_button_state != GPIO.input(self.yellow_button_pin):
+                        self.adjust_vibration_intensity(self.yellow_button_pin)
+                    self.prev_yellow_button_state = yellow_button_state
+        
+                if green_button_state != self.prev_green_button_state:
+                    time.sleep(self.debounce_time)
+                    if green_button_state != GPIO.input(self.green_button_pin):
+                        self.adjust_vibration_intensity(self.green_button_pin)
+                    self.prev_green_button_state = green_button_state
+        
+                time.sleep(0.01)  
+        
+        except KeyboardInterrupt:
+            self.pwm.stop()
+            GPIO.cleanup()
+
 
 if __name__ == "__main__":
     import sys
@@ -284,5 +375,11 @@ if __name__ == "__main__":
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
+    # VibrationController 객체 생성 및 실행
+    vibration_controller = VibrationController()
+    vibration_thread = threading.Thread(target=vibration_controller.run)
+    vibration_thread.start()
     MainWindow.show()
+    widget = EnglishTranscriptionWidget()
+    widget.show()
     sys.exit(app.exec_())
