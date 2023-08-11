@@ -30,7 +30,7 @@ try:
     print("Model successfully loaded deivce : ",device)
 except:
     print("Failed to load the model. Please check the model file.")
-    
+    print("a")#this is here just to cause an error
 
 import torchaudio
 from torchvision import transforms  # Import the transforms module
@@ -108,7 +108,7 @@ def continuous_sound_prediction(model, device, transformation, sample_rate, targ
     predicted_confidence = probabilities[0, predicted.item()].item()  # get the probability of the predicted class
 
     ######## Adjust 'x' probability   #########
-    change_label = "na"
+    change_label = "glass_shatter"
     change_probability = 0.5
     try:# if you have something to reduce
         x_index = selected_labels.index(change_label)
@@ -124,6 +124,7 @@ def continuous_sound_prediction(model, device, transformation, sample_rate, targ
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtGui import QMovie
 import torch
 import torch.nn as nn
 import torchaudio
@@ -160,121 +161,62 @@ class SoundAnalysis(QThread):
             count = count + 1
 
 
-import os
-from PyQt5 import QtWidgets, QtCore, QtGui
-import webbrowser
-
-class SoundDetectionWidget(QtWidgets.QWidget):
-    def __init__(self):
-        super().__init__()
-
-class EnglishTranscriptionWidget(QtWidgets.QWidget):
-    def __init__(self):
-        super().__init__()
-        self.button_open_notebook = QtWidgets.QPushButton("영어 받아쓰기")
-        self.button_open_notebook.clicked.connect(self.open_notebook)
-
-        layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(self.button_open_notebook)
-        self.setLayout(layout)
-
-    def open_notebook(self):
-        notebook_filename = "SPT_eng_spinx.ipynb"
-        webbrowser.open(notebook_filename)
-
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1036, 702)
-        
+        self.received_text = ""
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
-        MainWindow.setCentralWidget(self.centralwidget)
-        self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 799, 21))
-        self.menubar.setObjectName("menubar")
-        
-        # 메뉴
-        self.Menu = QtWidgets.QMenu(self.menubar)
-        self.Menu.setObjectName("Menu")
-        
-        # 다른 언어
-        self.Other_Language = QtWidgets.QMenu(self.menubar)
-        self.Other_Language.setObjectName("Other_Language")
-        
-        MainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
-        
-        self.sound_of_things = QtWidgets.QAction(MainWindow)
-        self.sound_of_things.setObjectName("sound_of_things")
-        
-        self.English = QtWidgets.QAction(MainWindow)
-        self.English.setObjectName("English")
-        
-        self.Other_Language.addAction(self.sound_of_things)
-        self.Other_Language.addSeparator() # 구분자
-        self.Other_Language.addAction(self.English)
-        
-        self.menubar.addAction(self.Menu.menuAction())
-        self.menubar.addAction(self.Other_Language.menuAction())
-        # 텍스트
         self.label = QtWidgets.QLabel(self.centralwidget)
         self.label.setGeometry(QtCore.QRect(30, 430, 971, 211))
         self.label.setAlignment(QtCore.Qt.AlignCenter)
         self.label.setObjectName("label")
-        
-        # 이미지
+
         self.label_2 = QtWidgets.QLabel(self.centralwidget)
         self.label_2.setGeometry(QtCore.QRect(30, 60, 971, 351))
         self.label_2.setText("")
         self.label_2.setObjectName("image")
         
+        MainWindow.setCentralWidget(self.centralwidget)
+        self.menubar = QtWidgets.QMenuBar(MainWindow)
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 29))
+        self.menubar.setObjectName("menubar")
+        MainWindow.setMenuBar(self.menubar)
+        self.statusbar = QtWidgets.QStatusBar(MainWindow)
+        self.statusbar.setObjectName("statusbar")
+        MainWindow.setStatusBar(self.statusbar)
+
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
-        # 주변소리 감지와 영어 받아쓰기 위젯 초기화
-        self.sound_detection_widget = SoundDetectionWidget()
-        self.english_transcription_widget = EnglishTranscriptionWidget()
-
-        # 액션과 함수를 연결
-        self.sound_of_things.triggered.connect(self.start_sound_detection)
-        self.English.triggered.connect(self.start_english_transcription)
-
-        # 시작은 주변소리 감지 위젯으로 설정
-        self.sound_detection_widget.show()
-
-    def start_sound_detection(self):
-        self.english_transcription_widget.hide()
-        self.sound_detection_widget.show()
-
-    def start_english_transcription(self):
-        self.sound_detection_widget.hide()
-        self.english_transcription_widget.show()
-
+        # Initialize SoundAnalysis and connect the result_signal with the updateLabel function
+        self.sound_analysis = SoundAnalysis(model, device, transformation, SAMPLE_RATE)
+        self.sound_analysis.result_signal.connect(self.updateLabel)
+        self.sound_analysis.result_signal.connect(self.updateLabel2)
+        self.sound_analysis.start()  # Start the sound analysis thread
+        
     def updateLabel2(self, predicted_label):
-        relative_image_folder_path = "../image_file" # \는 윈도우에서만 작동합니다.
-        image_folder_path = os.path.join(current_path, relative_image_folder_path)
-        full_file_name = os.path.join(image_folder_path, f"{predicted_label}.png")
-        self.label_2.setPixmap(QtGui.QPixmap(full_file_name))  
+        relative_image_folder_path = "../image_file" #\ only works for windows
+        image_folder_path= os.path.join(current_path, relative_image_folder_path)
+        full_file_name = os.path.join(image_folder_path, f"{predicted_label}.gif")
+        self.movie = QMovie(full_file_name)
+        self.label.setMovie(self.movie)
+        self.movie.start()
+        #self.label_2.setPixmap(QtGui.QPixmap(full_file_name))  
         #print(predicted_label)
 
     def updateLabel(self, predicted_label, predicted_confidence):
-        #print("Received signal")  # 신호가 받아졌을 때 메시지 출력
+        #print("Received signal")  # Print message when signal is received
         self.label.setText(f"{predicted_label}  {predicted_confidence*100:.2f}%")
         #print(predicted_label)
+
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
         self.label.setFont(QtGui.QFont("AppleSystemUIFont",20))
         self.label.setStyleSheet("Color : black")
-        self.Menu.setTitle(_translate("MainWindow", "메뉴"))
-        self.Other_Language.setTitle(_translate("MainWindow", "다른 언어"))
-        self.sound_of_things.setText(_translate("MainWindow", "주변소리 감지"))
-        self.English.setText(_translate("MainWindow", "영어"))
 
 import RPi.GPIO as GPIO
 import threading
@@ -367,19 +309,19 @@ class VibrationController:
         except KeyboardInterrupt:
             self.pwm.stop()
             GPIO.cleanup()
+        
+
 
 
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
     # VibrationController 객체 생성 및 실행
     vibration_controller = VibrationController()
     vibration_thread = threading.Thread(target=vibration_controller.run)
     vibration_thread.start()
+    ui = Ui_MainWindow()
+    ui.setupUi(MainWindow)
     MainWindow.show()
-    widget = EnglishTranscriptionWidget()
-    widget.show()
     sys.exit(app.exec_())
